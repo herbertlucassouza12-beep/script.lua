@@ -1,116 +1,133 @@
--- SUPER DIGGER | NPC HEAD TRACKER
--- Para testes no seu próprio jogo Roblox
+-- SUPER DIGGER AIMBOT (Câmera Travada / Lock)
+-- Cole e execute no seu executor.
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
-
+-- Variáveis de Configuração
 local Config = {
-    Enabled = false,
+    AimbotEnabled = false,
     FOV = 150,
-    Smoothness = 0.35,
+    TargetPart = "Head",
     AimKey = Enum.KeyCode.E
 }
 
--- Interface
-local Gui = Instance.new("ScreenGui")
-Gui.Name = "SuperDigger"
-Gui.ResetOnSpawn = false
-Gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+-- Serviços
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
-local Button = Instance.new("TextButton")
-Button.Size = UDim2.fromOffset(190, 45)
-Button.Position = UDim2.fromOffset(20, 100)
-Button.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-Button.TextColor3 = Color3.new(1, 1, 1)
-Button.Text = "NPC Head Tracker: OFF"
-Button.Parent = Gui
+-- Janela
+local Window = Rayfield:CreateWindow({
+   Name = "SUPER DIGGER | Aimbot LOCK",
+   LoadingTitle = "Carregando...",
+   LoadingSubtitle = "by SUPER DIGGER",
+   ConfigurationSaving = { Enabled = false },
+   KeySystem = false
+})
 
-Button.MouseButton1Click:Connect(function()
-    Config.Enabled = not Config.Enabled
-    Button.Text = Config.Enabled
-        and "NPC Head Tracker: ON"
-        or "NPC Head Tracker: OFF"
-end)
+local MainTab = Window:CreateTab("Aimbot", 4483362458)
 
--- Círculo visual do FOV
-local Circle = Instance.new("Frame")
-Circle.Name = "FOVCircle"
-Circle.AnchorPoint = Vector2.new(0.5, 0.5)
-Circle.Size = UDim2.fromOffset(Config.FOV * 2, Config.FOV * 2)
-Circle.BackgroundTransparency = 1
-Circle.Position = UDim2.fromScale(0.5, 0.5)
-Circle.Parent = Gui
+MainTab:CreateToggle({
+   Name = "Ativar Aimbot",
+   CurrentValue = false,
+   Flag = "AimbotToggle",
+   Callback = function(Value)
+       Config.AimbotEnabled = Value
+   end,
+})
 
-local Stroke = Instance.new("UIStroke")
-Stroke.Color = Color3.fromRGB(0, 255, 100)
-Stroke.Thickness = 2
-Stroke.Parent = Circle
+MainTab:CreateSlider({
+   Name = "FOV (Raio)",
+   Range = {10, 800},
+   Increment = 1,
+   Suffix = "px",
+   CurrentValue = 150,
+   Flag = "FOVSlider",
+   Callback = function(Value)
+       Config.FOV = Value
+   end,
+})
 
-local Corner = Instance.new("UICorner")
-Corner.CornerRadius = UDim.new(1, 0)
-Corner.Parent = Circle
+MainTab:CreateDropdown({
+   Name = "Parte do Corpo",
+   Options = {"Head", "Torso", "Foot"},
+   CurrentOption = "Head",
+   Flag = "PartDropdown",
+   Callback = function(Option)
+       Config.TargetPart = Option
+   end,
+})
 
--- Localiza a cabeça de um NPC vivo
-local function GetClosestNPC()
-    local closestHead = nil
+-- Função de pegar a peça
+local function GetTargetPosition(character)
+    if not character then return nil end
+    local part = nil
+    if Config.TargetPart == "Head" then
+        part = character:FindFirstChild("Head")
+    elseif Config.TargetPart == "Torso" then
+        part = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso") or character:FindFirstChild("HumanoidRootPart")
+    elseif Config.TargetPart == "Foot" then
+        part = character:FindFirstChild("LeftFoot") or character:FindFirstChild("RightFoot") or character:FindFirstChild("LeftLeg") or character:FindFirstChild("RightLeg")
+    end
+    return part
+end
+
+-- Função de achar o alvo mais próximo no FOV
+local function GetClosestPlayerInFOV()
+    local closestPlayer = nil
     local shortestDistance = Config.FOV
     local mousePos = UserInputService:GetMouseLocation()
-
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Humanoid") and obj.Health > 0 then
-            local character = obj.Parent
-            local head = character and character:FindFirstChild("Head")
-            local isPlayer = character
-                and Players:GetPlayerFromCharacter(character) ~= nil
-
-            if head and head:IsA("BasePart") and not isPlayer then
-                local screenPos, visible =
-                    Camera:WorldToViewportPoint(head.Position)
-
-                if visible and screenPos.Z > 0 then
-                    local distance = (
-                        Vector2.new(screenPos.X, screenPos.Y) - mousePos
-                    ).Magnitude
-
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local targetPart = GetTargetPosition(player.Character)
+            if targetPart then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                if onScreen then
+                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
                     if distance < shortestDistance then
                         shortestDistance = distance
-                        closestHead = head
+                        closestPlayer = player
                     end
                 end
             end
         end
     end
-
-    return closestHead
+    return closestPlayer
 end
 
+-- Loop de Mira Instantânea (Lock)
 RunService.RenderStepped:Connect(function()
-    Circle.Size = UDim2.fromOffset(Config.FOV * 2, Config.FOV * 2)
-    Circle.Position = UDim2.fromOffset(
-        UserInputService:GetMouseLocation().X,
-        UserInputService:GetMouseLocation().Y
-    )
-
-    if not Config.Enabled
-        or not UserInputService:IsKeyDown(Config.AimKey) then
-        return
+    if Config.AimbotEnabled and UserInputService:IsKeyDown(Config.AimKey) then
+        local targetPlayer = GetClosestPlayerInFOV()
+        
+        if targetPlayer then
+            local targetPart = GetTargetPosition(targetPlayer.Character)
+            if targetPart then
+                -- Pega a posição da câmera e a posição da cabeça
+                local cameraPos = Camera.CFrame.Position
+                local targetPos = targetPart.Position
+                
+                -- Calcula a matriz de rotação perfeita (LookAt) e força a câmera
+                Camera.CFrame = CFrame.new(cameraPos, targetPos)
+            end
+        end
     end
+end)
 
-    local head = GetClosestNPC()
+-- Círculo do FOV
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness = 1.5
+fovCircle.NumSides = 64
+fovCircle.Radius = Config.FOV
+fovCircle.Filled = false
+fovCircle.Color = Color3.fromRGB(0, 255, 136)
+fovCircle.Transparency = 0.8
+fovCircle.Visible = true
 
-    if head then
-        local targetCFrame = CFrame.lookAt(
-            Camera.CFrame.Position,
-            head.Position
-        )
-
-        Camera.CFrame = Camera.CFrame:Lerp(
-            targetCFrame,
-            Config.Smoothness
-        )
-    end
+RunService.RenderStepped:Connect(function()
+    fovCircle.Position = UserInputService:GetMouseLocation()
+    fovCircle.Radius = Config.FOV
 end)
