@@ -1,170 +1,116 @@
--- SUPER DIGGER AIMBOT MENU (Rayfield)
--- Funciona com executores que suportam loadstring e Drawing
+-- SUPER DIGGER | NPC HEAD TRACKER
+-- Para testes no seu próprio jogo Roblox
 
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
--- Variáveis de Configuração
-local Config = {
-    AimbotEnabled = false,
-    FOV = 120,
-    TargetPart = "Head", -- Opções: "Head", "Torso", "Foot"
-    Smoothness = 0.15,
-    AimKey = Enum.KeyCode.E -- Tecla para ativar (segurar)
-}
-
--- Serviços
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local Camera = workspace.CurrentCamera
+
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
--- Criar Janela
-local Window = Rayfield:CreateWindow({
-   Name = "SUPER DIGGER | Aimbot",
-   LoadingTitle = "Carregando...",
-   LoadingSubtitle = "by SUPER DIGGER",
-   ConfigurationSaving = {
-      Enabled = false,
-      FolderName = nil,
-      FileName = "SuperDiggerAim"
-   },
-   KeySystem = false
-})
+local Config = {
+    Enabled = false,
+    FOV = 150,
+    Smoothness = 0.35,
+    AimKey = Enum.KeyCode.E
+}
 
--- Aba Principal
-local MainTab = Window:CreateTab("Aimbot", 4483362458)
+-- Interface
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "SuperDigger"
+Gui.ResetOnSpawn = false
+Gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Toggle Aimbot
-MainTab:CreateToggle({
-   Name = "Ativar Aimbot",
-   CurrentValue = false,
-   Flag = "AimbotToggle",
-   Callback = function(Value)
-       Config.AimbotEnabled = Value
-   end,
-})
+local Button = Instance.new("TextButton")
+Button.Size = UDim2.fromOffset(190, 45)
+Button.Position = UDim2.fromOffset(20, 100)
+Button.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Button.TextColor3 = Color3.new(1, 1, 1)
+Button.Text = "NPC Head Tracker: OFF"
+Button.Parent = Gui
 
--- Slider do FOV
-MainTab:CreateSlider({
-   Name = "FOV (Raio)",
-   Range = {10, 500},
-   Increment = 1,
-   Suffix = "px",
-   CurrentValue = 120,
-   Flag = "FOVSlider",
-   Callback = function(Value)
-       Config.FOV = Value
-   end,
-})
+Button.MouseButton1Click:Connect(function()
+    Config.Enabled = not Config.Enabled
+    Button.Text = Config.Enabled
+        and "NPC Head Tracker: ON"
+        or "NPC Head Tracker: OFF"
+end)
 
--- Dropdown para escolher a parte do corpo
-MainTab:CreateDropdown({
-   Name = "Parte do Corpo",
-   Options = {"Head", "Torso", "Foot"},
-   CurrentOption = "Head",
-   Flag = "PartDropdown",
-   Callback = function(Option)
-       Config.TargetPart = Option
-   end,
-})
+-- Círculo visual do FOV
+local Circle = Instance.new("Frame")
+Circle.Name = "FOVCircle"
+Circle.AnchorPoint = Vector2.new(0.5, 0.5)
+Circle.Size = UDim2.fromOffset(Config.FOV * 2, Config.FOV * 2)
+Circle.BackgroundTransparency = 1
+Circle.Position = UDim2.fromScale(0.5, 0.5)
+Circle.Parent = Gui
 
--- Slider de Suavidade (Smooth)
-MainTab:CreateSlider({
-   Name = "Suavidade (Menor = Mais rápido)",
-   Range = {0.01, 1},
-   Increment = 0.01,
-   Suffix = "",
-   CurrentValue = 0.15,
-   Flag = "SmoothSlider",
-   Callback = function(Value)
-       Config.Smoothness = Value
-   end,
-})
+local Stroke = Instance.new("UIStroke")
+Stroke.Color = Color3.fromRGB(0, 255, 100)
+Stroke.Thickness = 2
+Stroke.Parent = Circle
 
--- Função para pegar a Posição da Peça (Cabeça, Peito ou Pé)
-local function GetTargetPosition(character)
-    if not character then return nil end
-    
-    local part = nil
-    
-    if Config.TargetPart == "Head" then
-        part = character:FindFirstChild("Head")
-    elseif Config.TargetPart == "Torso" then
-        -- Tenta achar o Torso superior ou o HumanoidRootPart
-        part = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso") or character:FindFirstChild("HumanoidRootPart")
-    elseif Config.TargetPart == "Foot" then
-        -- Tenta achar o pé esquerdo ou direito
-        part = character:FindFirstChild("LeftFoot") or character:FindFirstChild("RightFoot") or character:FindFirstChild("LeftLeg") or character:FindFirstChild("RightLeg")
-    end
-    
-    return part
-end
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(1, 0)
+Corner.Parent = Circle
 
--- Função para achar o jogador mais próximo do centro da tela (dentro do FOV)
-local function GetClosestPlayerInFOV()
-    local closestPlayer = nil
+-- Localiza a cabeça de um NPC vivo
+local function GetClosestNPC()
+    local closestHead = nil
     local shortestDistance = Config.FOV
     local mousePos = UserInputService:GetMouseLocation()
-    
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-            local targetPart = GetTargetPosition(player.Character)
-            if targetPart then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-                
-                if onScreen then
-                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Humanoid") and obj.Health > 0 then
+            local character = obj.Parent
+            local head = character and character:FindFirstChild("Head")
+            local isPlayer = character
+                and Players:GetPlayerFromCharacter(character) ~= nil
+
+            if head and head:IsA("BasePart") and not isPlayer then
+                local screenPos, visible =
+                    Camera:WorldToViewportPoint(head.Position)
+
+                if visible and screenPos.Z > 0 then
+                    local distance = (
+                        Vector2.new(screenPos.X, screenPos.Y) - mousePos
+                    ).Magnitude
+
                     if distance < shortestDistance then
                         shortestDistance = distance
-                        closestPlayer = player
+                        closestHead = head
                     end
                 end
             end
         end
     end
-    return closestPlayer
+
+    return closestHead
 end
 
--- Loop de Mira (RenderStepped)
 RunService.RenderStepped:Connect(function()
-    if Config.AimbotEnabled then
-        -- Verifica se a tecla está pressionada (padrão E)
-        if UserInputService:IsKeyDown(Config.AimKey) then
-            local targetPlayer = GetClosestPlayerInFOV()
-            
-            if targetPlayer then
-                local targetPart = GetTargetPosition(targetPlayer.Character)
-                if targetPart then
-                    -- Calcula a CFrame para olhar para o alvo
-                    local lookAt = CFrame.new(Camera.CFrame.Position, targetPart.Position)
-                    -- Aplica a suavidade (Lerp)
-                    Camera.CFrame = Camera.CFrame:Lerp(lookAt, Config.Smoothness)
-                end
-            end
-        end
+    Circle.Size = UDim2.fromOffset(Config.FOV * 2, Config.FOV * 2)
+    Circle.Position = UDim2.fromOffset(
+        UserInputService:GetMouseLocation().X,
+        UserInputService:GetMouseLocation().Y
+    )
+
+    if not Config.Enabled
+        or not UserInputService:IsKeyDown(Config.AimKey) then
+        return
+    end
+
+    local head = GetClosestNPC()
+
+    if head then
+        local targetCFrame = CFrame.lookAt(
+            Camera.CFrame.Position,
+            head.Position
+        )
+
+        Camera.CFrame = Camera.CFrame:Lerp(
+            targetCFrame,
+            Config.Smoothness
+        )
     end
 end)
-
--- Desenhar o Círculo do FOV na tela
-local fovCircle = Drawing.new("Circle")
-fovCircle.Thickness = 1
-fovCircle.NumSides = 64
-fovCircle.Radius = Config.FOV
-fovCircle.Filled = false
-fovCircle.Color = Color3.fromRGB(255, 255, 255)
-fovCircle.Transparency = 0.7
-fovCircle.Visible = true
-
--- Atualiza o círculo quando o FOV muda
-RunService.RenderStepped:Connect(function()
-    fovCircle.Position = UserInputService:GetMouseLocation()
-    fovCircle.Radius = Config.FOV
-end)
-
-Rayfield:Notify({
-   Title = "SUPER DIGGER",
-   Content = "Menu carregado. Pressione E para mirar.",
-   Duration = 5,
-   Image = 4483362458,
-})
