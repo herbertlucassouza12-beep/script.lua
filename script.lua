@@ -1,5 +1,4 @@
--- MINI UI - Estrutura Base (Estilo da Imagem)
--- Adapte as funções internas conforme o jogo.
+-- MINI UI - Com Speed Funcional e Personagem de Cabeça para Baixo
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -12,9 +11,9 @@ local LocalPlayer = Players.LocalPlayer
 local State = {
     AutoKick = false,
     AutoBuy = false,
-    InvisAngle = 180,
-    StealSpeed = 20,
-    AutoDestroy = false
+    StealSpeed = 20, -- Valor inicial do slider
+    AutoDestroy = false,
+    UpsideDown = false
 }
 
 -- ==========================================
@@ -27,8 +26,8 @@ ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "Main"
-MainFrame.Size = UDim2.new(0, 200, 0, 280)
-MainFrame.Position = UDim2.new(0.5, -100, 0.5, -140)
+MainFrame.Size = UDim2.new(0, 200, 0, 320) -- Aumentei um pouco a altura para caber o novo botão
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -160)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -39,7 +38,6 @@ local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = MainFrame
 
--- Título
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
@@ -51,7 +49,6 @@ Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Position = UDim2.new(0, 10, 0, 0)
 Title.Parent = MainFrame
 
--- Separador
 local Sep = Instance.new("Frame")
 Sep.Size = UDim2.new(1, -20, 0, 1)
 Sep.Position = UDim2.new(0, 10, 0, 30)
@@ -59,9 +56,8 @@ Sep.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 Sep.BorderSizePixel = 0
 Sep.Parent = MainFrame
 
--- Container de Scroll (para os botões)
 local Scroll = Instance.new("ScrollingFrame")
-Scroll.Size = UDim2.new(1, -10, 1, -40)
+Scroll.Size = UDim2.new(1, -10, 1, -70)
 Scroll.Position = UDim2.new(0, 5, 0, 35)
 Scroll.BackgroundTransparency = 1
 Scroll.ScrollBarThickness = 2
@@ -74,7 +70,7 @@ Layout.SortOrder = Enum.SortOrder.LayoutOrder
 Layout.Parent = Scroll
 
 -- ==========================================
--- FUNÇÕES AUXILIARES PARA CRIAR BOTÕES
+-- FUNÇÕES AUXILIARES
 -- ==========================================
 local function CreateLabel(text)
     local lbl = Instance.new("TextLabel")
@@ -113,20 +109,15 @@ end
 -- ==========================================
 CreateLabel("AUTO")
 
--- Auto Kick (Sai do jogo)
 local kickBtn = CreateButton("Auto Kick [OFF]", function()
     State.AutoKick = not State.AutoKick
     kickBtn.Text = "Auto Kick " .. (State.AutoKick and "[ON]" or "[OFF]")
     if State.AutoKick then
-        -- Lógica para sair do jogo (Kick local)
-        -- O Roblox permite que o cliente se auto-expulse.
         LocalPlayer:Kick("Auto Kick Ativado")
     end
 end)
 
--- Auto Buy (Placeholder)
 CreateButton("Auto Buy [OFF]", function()
-    -- Lógica específica do jogo aqui
     print("Auto Buy toggle")
 end)
 
@@ -135,7 +126,7 @@ end)
 -- ==========================================
 CreateLabel("PRESETS")
 
--- Slider Simples (Visual e Funcional para Speed)
+-- SLIDER DE SPEED FUNCIONAL
 local speedFrame = Instance.new("Frame")
 speedFrame.Size = UDim2.new(1, 0, 0, 50)
 speedFrame.BackgroundTransparency = 1
@@ -162,7 +153,6 @@ speedValue.TextSize = 12
 speedValue.TextXAlignment = Enum.TextXAlignment.Right
 speedValue.Parent = speedFrame
 
--- Barra de fundo do slider
 local barBg = Instance.new("Frame")
 barBg.Size = UDim2.new(1, 0, 0, 6)
 barBg.Position = UDim2.new(0, 0, 0, 25)
@@ -174,9 +164,8 @@ local barCorner = Instance.new("UICorner")
 barCorner.CornerRadius = UDim.new(0, 3)
 barCorner.Parent = barBg
 
--- Preenchimento do slider
 local barFill = Instance.new("Frame")
-barFill.Size = UDim2.new(0.2, 0, 1, 0) -- 20% inicial
+barFill.Size = UDim2.new(0.2, 0, 1, 0) -- Inicia em 20%
 barFill.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
 barFill.BorderSizePixel = 0
 barFill.Parent = barBg
@@ -185,7 +174,6 @@ local fillCorner = Instance.new("UICorner")
 fillCorner.CornerRadius = UDim.new(0, 3)
 fillCorner.Parent = barFill
 
--- Botão invisível para arrastar o slider
 local dragBtn = Instance.new("TextButton")
 dragBtn.Size = UDim2.new(1, 0, 1, 0)
 dragBtn.BackgroundTransparency = 1
@@ -212,23 +200,22 @@ RunService.RenderStepped:Connect(function()
         local relativeX = math.clamp((mouse.X - barPos.X) / barSize.X, 0, 1)
         
         barFill.Size = UDim2.new(relativeX, 0, 1, 0)
-        -- Mapear 0-1 para 0-100 (exemplo de range)
+        -- Mapeia o slider de 0 a 100
         State.StealSpeed = math.floor(relativeX * 100)
         speedValue.Text = tostring(State.StealSpeed)
     end
 end)
 
--- ==========================================
--- SEÇÃO: SESSÃO
--- ==========================================
-CreateLabel("SESSION")
-
-CreateButton("Rejoin", function()
-    game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
-end)
-
-CreateButton("Kick (Y)", function()
-    LocalPlayer:Kick("Kick Manual")
+-- LOOP QUE APLICA A VELOCIDADE NO PERSONAGEM
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    if char then
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            -- Altera a velocidade baseada no valor do slider (WalkSpeed)
+            humanoid.WalkSpeed = State.StealSpeed
+        end
+    end
 end)
 
 -- ==========================================
@@ -237,28 +224,46 @@ end)
 CreateLabel("QUICK ACTIONS")
 
 CreateButton("Drop Brainrot", function()
-    -- Lógica para dropar o item
     print("Drop")
 end)
 
+-- FUNÇÃO DE RESET (Intocada, como você pediu)
 CreateButton("Instant Reset", function()
     if LocalPlayer.Character then
         LocalPlayer.Character:BreakJoints()
     end
 end)
 
+-- BOTÃO DE CABEÇA PARA BAIXO
+local upsideDownBtn = CreateButton("De Cabeça pra Baixo [OFF]", function()
+    State.UpsideDown = not State.UpsideDown
+    upsideDownBtn.Text = "De Cabeça pra Baixo " .. (State.UpsideDown and "[ON]" or "[OFF]")
+    
+    local char = LocalPlayer.Character
+    if char then
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            if State.UpsideDown then
+                -- Vira o personagem de cabeça para baixo
+                hrp.CFrame = hrp.CFrame * CFrame.Angles(0, 0, math.rad(180))
+            else
+                -- Volta ao normal
+                hrp.CFrame = hrp.CFrame * CFrame.Angles(0, 0, math.rad(-180))
+            end
+        end
+    end
+end)
+
 CreateButton("TP", function()
-    -- Lógica de teleporte
     print("TP")
 end)
 
 CreateButton("Clone", function()
-    -- Lógica de clone
     print("Clone")
 end)
 
 -- ==========================================
--- FOOTER: AUTO DESTROY
+-- FOOTER
 -- ==========================================
 local footerFrame = Instance.new("Frame")
 footerFrame.Size = UDim2.new(1, 0, 0, 30)
