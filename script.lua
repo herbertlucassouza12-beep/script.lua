@@ -1,5 +1,5 @@
 --[================================================================================]--
--- Project: Functional Tactical UI Hub (Aimbot com Tecla E, FOV, Antena, HUD Móvel)--
+-- Project: Functional Tactical UI Hub (Input & Aimbot Corrigido)                   --
 -- Target: Roblox Client Instrumentation (Luau / Real Executor)                     --
 --[================================================================================]--
 
@@ -10,9 +10,12 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Limpeza de instâncias anteriores
+-- Limpeza de instâncias anteriores para evitar duplicação
 if CoreGui:FindFirstChild("TacticalEngineeringHub") then
     CoreGui.TacticalEngineeringHub:Destroy()
+end
+if CoreGui:FindFirstChild("FOVCircleGui") then
+    CoreGui.FOVCircleGui:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -45,7 +48,7 @@ MainStroke.Color = Color3.fromRGB(50, 50, 70)
 MainStroke.Thickness = 1.5
 MainStroke.Parent = MainFrame
 
--- Barra Superior (Usada para arrastar o HUD)
+-- Barra Superior (Arrastar HUD)
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
 TopBar.Size = UDim2.new(1, 0, 0, 40)
@@ -62,7 +65,7 @@ TitleLabel.Size = UDim2.new(1, -20, 1, 0)
 TitleLabel.Position = UDim2.new(0, 15, 0, 0)
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "TACTICAL HUB [TECLA E + HUD MÓVEL]"
+TitleLabel.Text = "TACTICAL HUB [ULTIMATE FIX]"
 TitleLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
 TitleLabel.TextSize = 14
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -90,6 +93,21 @@ local Settings = {
     FovRadius = 180,
     AntennaEnabled = false,
 }
+
+-- Variável de controle da Tecla E
+local isHoldingE = false
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.KeyCode == Enum.KeyCode.E then
+        isHoldingE = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.E then
+        isHoldingE = false
+    end
+end)
 
 -- Função para criar toggles interativos
 local function CreateToggle(name, callback)
@@ -153,7 +171,7 @@ local function CreateToggle(name, callback)
     end)
 end
 
-CreateToggle("Aimbot (Segurar TECLA E para grudar na cabeça)", function(state)
+CreateToggle("Aimbot (Segurar TECLA E)", function(state)
     Settings.AimbotEnabled = state
 end)
 
@@ -165,7 +183,7 @@ CreateToggle("ESP Antenna (Linha na Cabeça)", function(state)
     Settings.AntennaEnabled = state
 end)
 
--- Lógica para Movimentar o HUD (Arrastar pela barra superior)
+-- Lógica para Movimentar o HUD (Arrastar pela barra superior de forma otimizada)
 local dragging, dragInput, dragStart, startPos
 TopBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -294,8 +312,8 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Aimbot: Ativado ao manter a TECLA 'E' pressionada
-    if Settings.AimbotEnabled and UserInputService:IsKeyDown(Enum.KeyCode.E) then
+    -- Aimbot: Ativado ao manter a Tecla E pressionada
+    if Settings.AimbotEnabled and isHoldingE then
         local targetHead = GetClosestTarget()
         if targetHead then
             Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
@@ -303,4 +321,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("[+] Hub configurado: Arraste pela barra superior, ative as opções e segure 'E' para o Aimbot!")
+print("[+] Hub injetado com sucesso! Arraste pelo topo e segure E.")
