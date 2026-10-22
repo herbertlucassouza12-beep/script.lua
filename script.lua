@@ -1,324 +1,133 @@
---[================================================================================]--
--- Project: Functional Tactical UI Hub (Input & Aimbot Corrigido)                   --
--- Target: Roblox Client Instrumentation (Luau / Real Executor)                     --
---[================================================================================]--
+-- SUPER DIGGER AIMBOT (Câmera Travada / Lock)
+-- Cole e execute no seu executor.
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local CoreGui = game:GetService("CoreGui")
-local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- Limpeza de instâncias anteriores para evitar duplicação
-if CoreGui:FindFirstChild("TacticalEngineeringHub") then
-    CoreGui.TacticalEngineeringHub:Destroy()
-end
-if CoreGui:FindFirstChild("FOVCircleGui") then
-    CoreGui.FOVCircleGui:Destroy()
-end
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TacticalEngineeringHub"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-pcall(function()
-    ScreenGui.Parent = CoreGui
-end)
-if not ScreenGui.Parent then
-    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-end
-
--- Janela Principal (HUD Móvel)
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 520, 0, 380)
-MainFrame.Position = UDim2.new(0.5, -260, 0.5, -190)
-MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
-MainFrame.BorderSizePixel = 0
-MainFrame.Parent = ScreenGui
-
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 8)
-MainCorner.Parent = MainFrame
-
-local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = Color3.fromRGB(50, 50, 70)
-MainStroke.Thickness = 1.5
-MainStroke.Parent = MainFrame
-
--- Barra Superior (Arrastar HUD)
-local TopBar = Instance.new("Frame")
-TopBar.Name = "TopBar"
-TopBar.Size = UDim2.new(1, 0, 0, 40)
-TopBar.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
-TopBar.BorderSizePixel = 0
-TopBar.Parent = MainFrame
-
-local TopCorner = Instance.new("UICorner")
-TopCorner.CornerRadius = UDim.new(0, 8)
-TopCorner.Parent = TopBar
-
-local TitleLabel = Instance.new("TextLabel")
-TitleLabel.Size = UDim2.new(1, -20, 1, 0)
-TitleLabel.Position = UDim2.new(0, 15, 0, 0)
-TitleLabel.BackgroundTransparency = 1
-TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "TACTICAL HUB [ULTIMATE FIX]"
-TitleLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
-TitleLabel.TextSize = 14
-TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-TitleLabel.Parent = TopBar
-
--- Container de Opções
-local ContentContainer = Instance.new("ScrollingFrame")
-ContentContainer.Size = UDim2.new(1, -20, 1, -60)
-ContentContainer.Position = UDim2.new(0, 10, 0, 50)
-ContentContainer.BackgroundTransparency = 1
-ContentContainer.BorderSizePixel = 0
-ContentContainer.CanvasSize = UDim2.new(0, 0, 0, 320)
-ContentContainer.ScrollBarThickness = 4
-ContentContainer.Parent = MainFrame
-
-local UIList = Instance.new("UIListLayout")
-UIList.Padding = UDim.new(0, 10)
-UIList.SortOrder = Enum.SortOrder.LayoutOrder
-UIList.Parent = ContentContainer
-
--- Configurações de Estado
-local Settings = {
+-- Variáveis de Configuração
+local Config = {
     AimbotEnabled = false,
-    FovEnabled = false,
-    FovRadius = 180,
-    AntennaEnabled = false,
+    FOV = 150,
+    TargetPart = "Head",
+    AimKey = Enum.KeyCode.E
 }
 
--- Variável de controle da Tecla E
-local isHoldingE = false
+-- Serviços
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if input.KeyCode == Enum.KeyCode.E then
-        isHoldingE = true
+-- Janela
+local Window = Rayfield:CreateWindow({
+   Name = "SUPER DIGGER | Aimbot LOCK",
+   LoadingTitle = "Carregando...",
+   LoadingSubtitle = "by SUPER DIGGER",
+   ConfigurationSaving = { Enabled = false },
+   KeySystem = false
+})
+
+local MainTab = Window:CreateTab("Aimbot", 4483362458)
+
+MainTab:CreateToggle({
+   Name = "Ativar Aimbot",
+   CurrentValue = false,
+   Flag = "AimbotToggle",
+   Callback = function(Value)
+       Config.AimbotEnabled = Value
+   end,
+})
+
+MainTab:CreateSlider({
+   Name = "FOV (Raio)",
+   Range = {10, 800},
+   Increment = 1,
+   Suffix = "px",
+   CurrentValue = 150,
+   Flag = "FOVSlider",
+   Callback = function(Value)
+       Config.FOV = Value
+   end,
+})
+
+MainTab:CreateDropdown({
+   Name = "Parte do Corpo",
+   Options = {"Head", "Torso", "Foot"},
+   CurrentOption = "Head",
+   Flag = "PartDropdown",
+   Callback = function(Option)
+       Config.TargetPart = Option
+   end,
+})
+
+-- Função de pegar a peça
+local function GetTargetPosition(character)
+    if not character then return nil end
+    local part = nil
+    if Config.TargetPart == "Head" then
+        part = character:FindFirstChild("Head")
+    elseif Config.TargetPart == "Torso" then
+        part = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso") or character:FindFirstChild("HumanoidRootPart")
+    elseif Config.TargetPart == "Foot" then
+        part = character:FindFirstChild("LeftFoot") or character:FindFirstChild("RightFoot") or character:FindFirstChild("LeftLeg") or character:FindFirstChild("RightLeg")
     end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.E then
-        isHoldingE = false
-    end
-end)
-
--- Função para criar toggles interativos
-local function CreateToggle(name, callback)
-    local ToggleFrame = Instance.new("Frame")
-    ToggleFrame.Size = UDim2.new(1, 0, 0, 36)
-    ToggleFrame.BackgroundColor3 = Color3.fromRGB(26, 26, 36)
-    ToggleFrame.BorderSizePixel = 0
-    ToggleFrame.Parent = ContentContainer
-
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 6)
-    Corner.Parent = ToggleFrame
-
-    local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, -60, 1, 0)
-    Label.Position = UDim2.new(0, 12, 0, 0)
-    Label.BackgroundTransparency = 1
-    Label.Font = Enum.Font.GothamMedium
-    Label.Text = name
-    Label.TextColor3 = Color3.fromRGB(190, 190, 210)
-    Label.TextSize = 13
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.Parent = ToggleFrame
-
-    local ToggleBtn = Instance.new("TextButton")
-    ToggleBtn.Size = UDim2.new(0, 40, 0, 20)
-    ToggleBtn.Position = UDim2.new(1, -50, 0.5, -10)
-    ToggleBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
-    ToggleBtn.AutoButtonColor = false
-    ToggleBtn.Text = ""
-    ToggleBtn.Parent = ToggleFrame
-
-    local BtnCorner = Instance.new("UICorner")
-    BtnCorner.CornerRadius = UDim.new(1, 0)
-    BtnCorner.Parent = ToggleBtn
-
-    local Indicator = Instance.new("Frame")
-    Indicator.Size = UDim2.new(0, 16, 0, 16)
-    Indicator.Position = UDim2.new(0, 2, 0.5, -8)
-    Indicator.BackgroundColor3 = Color3.fromRGB(200, 200, 220)
-    Indicator.BorderSizePixel = 0
-    Indicator.Parent = ToggleBtn
-
-    local IndCorner = Instance.new("UICorner")
-    IndCorner.CornerRadius = UDim.new(1, 0)
-    IndCorner.Parent = Indicator
-
-    local state = false
-    ToggleBtn.MouseButton1Click:Connect(function()
-        state = not state
-        local targetColor = state and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(45, 45, 60)
-        local targetPos = state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
-        
-        ToggleBtn.BackgroundColor3 = state and Color3.fromRGB(40, 100, 60) or Color3.fromRGB(45, 45, 60)
-        Indicator.Position = targetPos
-        Indicator.BackgroundColor3 = targetColor
-
-        if callback then
-            callback(state)
-        end
-    end)
+    return part
 end
 
-CreateToggle("Aimbot (Segurar TECLA E)", function(state)
-    Settings.AimbotEnabled = state
-end)
-
-CreateToggle("Holographic FOV Circle", function(state)
-    Settings.FovEnabled = state
-end)
-
-CreateToggle("ESP Antenna (Linha na Cabeça)", function(state)
-    Settings.AntennaEnabled = state
-end)
-
--- Lógica para Movimentar o HUD (Arrastar pela barra superior de forma otimizada)
-local dragging, dragInput, dragStart, startPos
-TopBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    if dragging and dragInput then
-        local delta = dragInput.Position - dragStart
-        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
--- Círculo de FOV
-local FOVGui = Instance.new("ScreenGui")
-FOVGui.Name = "FOVCircleGui"
-FOVGui.Parent = CoreGui
-
-local FOVFrame = Instance.new("Frame")
-FOVFrame.Size = UDim2.new(0, Settings.FovRadius * 2, 0, Settings.FovRadius * 2)
-FOVFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-FOVFrame.BackgroundTransparency = 1
-FOVFrame.Visible = false
-FOVFrame.Parent = FOVGui
-
-local FOVStroke = Instance.new("UIStroke")
-FOVStroke.Color = Color3.fromRGB(0, 255, 200)
-FOVStroke.Thickness = 1.5
-FOVStroke.Parent = FOVFrame
-
-local FOVCorner = Instance.new("UICorner")
-FOVCorner.CornerRadius = UDim.new(1, 0)
-FOVCorner.Parent = FOVFrame
-
--- Gerenciador de Antenas ESP
-local ActiveAntennas = {}
-
-local function UpdateAntenna(player, enable)
-    if enable then
-        if player.Character and player.Character:FindFirstChild("Head") and not ActiveAntennas[player] then
-            local head = player.Character.Head
-            
-            local bb = Instance.new("BillboardGui")
-            bb.Name = "AntennaESP"
-            bb.Size = UDim2.new(0, 4, 0, 50)
-            bb.StudsOffset = Vector3.new(0, 3, 0)
-            bb.AlwaysOnTop = true
-            bb.Parent = head
-            
-            local line = Instance.new("Frame")
-            line.Size = UDim2.new(1, 0, 1, 0)
-            line.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-            line.BorderSizePixel = 0
-            line.Parent = bb
-            
-            ActiveAntennas[player] = bb
-        end
-    else
-        if ActiveAntennas[player] then
-            ActiveAntennas[player]:Destroy()
-            ActiveAntennas[player] = nil
-        end
-    end
-end
-
--- Detecção do alvo mais próximo dentro do FOV
-local function GetClosestTarget()
-    local mouseLocation = UserInputService:GetMouseLocation()
-    local closestTarget = nil
-    local shortestDistance = Settings.FovRadius
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-            local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
-            if humanoid and humanoid.Health > 0 and rootPart then
-                local head = player.Character.Head
-                local screenPoint, onScreen = Camera:WorldToViewportPoint(head.Position)
+-- Função de achar o alvo mais próximo no FOV
+local function GetClosestPlayerInFOV()
+    local closestPlayer = nil
+    local shortestDistance = Config.FOV
+    local mousePos = UserInputService:GetMouseLocation()
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local targetPart = GetTargetPosition(player.Character)
+            if targetPart then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
                 if onScreen then
-                    local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - mouseLocation).Magnitude
+                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
                     if distance < shortestDistance then
                         shortestDistance = distance
-                        closestTarget = head
+                        closestPlayer = player
                     end
                 end
             end
         end
     end
-    return closestTarget
+    return closestPlayer
 end
 
--- Loop Principal de Execução
+-- Loop de Mira Instantânea (Lock)
 RunService.RenderStepped:Connect(function()
-    -- Atualizar FOV
-    if Settings.FovEnabled then
-        FOVFrame.Visible = true
-        FOVFrame.Size = UDim2.new(0, Settings.FovRadius * 2, 0, Settings.FovRadius * 2)
-        local mousePos = UserInputService:GetMouseLocation()
-        FOVFrame.Position = UDim2.new(0, mousePos.X, 0, mousePos.Y)
-    else
-        FOVFrame.Visible = false
-    end
-
-    -- Gerenciar Antenas
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            if Settings.AntennaEnabled then
-                UpdateAntenna(player, true)
-            else
-                UpdateAntenna(player, false)
+    if Config.AimbotEnabled and UserInputService:IsKeyDown(Config.AimKey) then
+        local targetPlayer = GetClosestPlayerInFOV()
+        
+        if targetPlayer then
+            local targetPart = GetTargetPosition(targetPlayer.Character)
+            if targetPart then
+                -- Pega a posição da câmera e a posição da cabeça
+                local cameraPos = Camera.CFrame.Position
+                local targetPos = targetPart.Position
+                
+                -- Calcula a matriz de rotação perfeita (LookAt) e força a câmera
+                Camera.CFrame = CFrame.new(cameraPos, targetPos)
             end
-        end
-    end
-
-    -- Aimbot: Ativado ao manter a Tecla E pressionada
-    if Settings.AimbotEnabled and isHoldingE then
-        local targetHead = GetClosestTarget()
-        if targetHead then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
         end
     end
 end)
 
-print("[+] Hub injetado com sucesso! Arraste pelo topo e segure E.")
+-- Círculo do FOV
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness = 1.5
+fovCircle.NumSides = 64
+fovCircle.Radius = Config.FOV
+fovCircle.Filled = false
+fovCircle.Color = Color3.fromRGB(0, 255, 136)
+fovCircle.Transparency = 0.8
+fovCircle.Visible = true
+
+RunService.RenderStepped:Connect(function()
+    fovCircle.Position = UserInputService:GetMouseLocation()
+    fovCircle.Radius = Config.FOV
+end)
