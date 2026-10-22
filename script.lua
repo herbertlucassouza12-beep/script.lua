@@ -1,5 +1,5 @@
 --[================================================================================]--
--- Project: Functional Tactical UI Hub (Aimbot, Holographic FOV, Antenna ESP)       --
+-- Project: Functional Tactical UI Hub (Aimbot, FOV, Antenna ESP)                   --
 -- Target: Roblox Client Instrumentation (Luau)                                     --
 --[================================================================================]--
 
@@ -10,7 +10,7 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Prevent duplicate instances
+-- Limpeza de instâncias anteriores
 if CoreGui:FindFirstChild("TacticalEngineeringHub") then
     CoreGui.TacticalEngineeringHub:Destroy()
 end
@@ -27,7 +27,7 @@ if not ScreenGui.Parent then
     ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 end
 
--- Main Window Frame
+-- Janela Principal
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 520, 0, 380)
@@ -45,7 +45,7 @@ MainStroke.Color = Color3.fromRGB(50, 50, 70)
 MainStroke.Thickness = 1.5
 MainStroke.Parent = MainFrame
 
--- Top Bar / Title
+-- Barra Superior
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
 TopBar.Size = UDim2.new(1, 0, 0, 40)
@@ -57,25 +57,18 @@ local TopCorner = Instance.new("UICorner")
 TopCorner.CornerRadius = UDim.new(0, 8)
 TopCorner.Parent = TopBar
 
-local FixTop = Instance.new("Frame")
-FixTop.Size = UDim2.new(1, 0, 0, 10)
-FixTop.Position = UDim2.new(0, 0, 1, -10)
-FixTop.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
-FixTop.BorderSizePixel = 0
-FixTop.Parent = TopBar
-
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Size = UDim2.new(1, -20, 1, 0)
 TitleLabel.Position = UDim2.new(0, 15, 0, 0)
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "TACTICAL INSTRUMENTATION HUB [ACTIVE]"
+TitleLabel.Text = "TACTICAL INSTRUMENTATION HUB [FIXED]"
 TitleLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
 TitleLabel.TextSize = 14
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 TitleLabel.Parent = TopBar
 
--- Content Container
+-- Container de Opções
 local ContentContainer = Instance.new("ScrollingFrame")
 ContentContainer.Size = UDim2.new(1, -20, 1, -60)
 ContentContainer.Position = UDim2.new(0, 10, 0, 50)
@@ -90,15 +83,15 @@ UIList.Padding = UDim.new(0, 10)
 UIList.SortOrder = Enum.SortOrder.LayoutOrder
 UIList.Parent = ContentContainer
 
--- State Configuration
+-- Configurações de Estado
 local Settings = {
     AimbotEnabled = false,
     FovEnabled = false,
-    FovRadius = 150,
+    FovRadius = 180,
     AntennaEnabled = false,
 }
 
--- Helper function to create functional toggles
+-- Função para criar toggles interativos
 local function CreateToggle(name, callback)
     local ToggleFrame = Instance.new("Frame")
     ToggleFrame.Size = UDim2.new(1, 0, 0, 36)
@@ -160,7 +153,6 @@ local function CreateToggle(name, callback)
     end)
 end
 
--- Hook Toggles to State Flags
 CreateToggle("Aimbot (Head Lock - Segure Botão Direito)", function(state)
     Settings.AimbotEnabled = state
 end)
@@ -173,45 +165,57 @@ CreateToggle("ESP Antenna (Linha na Cabeça)", function(state)
     Settings.AntennaEnabled = state
 end)
 
--- Draggable Window Logic
-local dragging, dragInput, dragStart, startPos
-TopBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
+-- Sistema de FOV utilizando GUI do Roblox (Garante compatibilidade total sem depender de Drawing API externa)
+local FOVGui = Instance.new("ScreenGui")
+FOVGui.Name = "FOVCircleGui"
+FOVGui.Parent = CoreGui
+
+local FOVFrame = Instance.new("Frame")
+FOVFrame.Size = UDim2.new(0, Settings.FovRadius * 2, 0, Settings.FovRadius * 2)
+FOVFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+FOVFrame.BackgroundTransparency = 1
+FOVFrame.Visible = false
+FOVFrame.Parent = FOVGui
+
+local FOVStroke = Instance.new("UIStroke")
+FOVStroke.Color = Color3.fromRGB(0, 255, 200)
+FOVStroke.Thickness = 1.5
+FOVStroke.Parent = FOVFrame
+
+local FOVCorner = Instance.new("UICorner")
+FOVCorner.CornerRadius = UDim.new(1, 0)
+FOVCorner.Parent = FOVFrame
+
+-- Estrutura de Armazenamento de Antenas (BillboardGuids na cabeça)
+local ActiveAntennas = {}
+
+local function UpdateAntenna(player, enable)
+    if enable then
+        if player.Character and player.Character:FindFirstChild("Head") and not ActiveAntennas[player] then
+            local head = player.Character.Head
+            
+            local bb = Instance.new("BillboardGui")
+            bb.Name = "AntennaESP"
+            bb.Size = UDim2.new(0, 4, 0, 50)
+            bb.StudsOffset = Vector3.new(0, 3, 0)
+            bb.AlwaysOnTop = true
+            bb.Parent = head
+            
+            local line = Instance.new("Frame")
+            line.Size = UDim2.new(1, 0, 1, 0)
+            line.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+            line.BorderSizePixel = 0
+            line.Parent = bb
+            
+            ActiveAntennas[player] = bb
+        end
+    else
+        if ActiveAntennas[player] then
+            ActiveAntennas[player]:Destroy()
+            ActiveAntennas[player] = nil
+        end
     end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
-    if dragging and dragInput then
-        local delta = dragInput.Position - dragStart
-        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
--- FOV Circle Drawing Creation
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 1.5
-FOVCircle.NumSides = 64
-FOVCircle.Filled = false
-FOVCircle.Transparency = 0.7
-FOVCircle.Color = Color3.fromRGB(0, 255, 200)
-FOVCircle.Visible = false
-
--- Antenna Storage Tracking
-local AntennaDrawings = {}
+end
 
 local function GetClosestTarget()
     local mouseLocation = UserInputService:GetMouseLocation()
@@ -223,21 +227,13 @@ local function GetClosestTarget()
             local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
             local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
             if humanoid and humanoid.Health > 0 and rootPart then
-                -- Opcional: checagem de time (caso o jogo utilize Teams)
-                local isEnemy = true
-                if LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team then
-                    isEnemy = false
-                end
-
-                if isEnemy then
-                    local head = player.Character.Head
-                    local screenPoint, onScreen = Camera:WorldToViewportPoint(head.Position)
-                    if onScreen then
-                        local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - mouseLocation).Magnitude
-                        if distance < shortestDistance then
-                            shortestDistance = distance
-                            closestTarget = head
-                        end
+                local head = player.Character.Head
+                local screenPoint, onScreen = Camera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - mouseLocation).Magnitude
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestTarget = head
                     end
                 end
             end
@@ -246,61 +242,30 @@ local function GetClosestTarget()
     return closestTarget
 end
 
--- Main Runtime Loop for Features (Aimbot, FOV & Antenas)
+-- Loop de Execução Principal
 RunService.RenderStepped:Connect(function()
-    -- 1. FOV Circle Update
+    -- Atualizar FOV
     if Settings.FovEnabled then
-        FOVCircle.Visible = true
-        FOVCircle.Radius = Settings.FovRadius
-        FOVCircle.Position = UserInputService:GetMouseLocation()
+        FOVFrame.Visible = true
+        FOVFrame.Size = UDim2.new(0, Settings.FovRadius * 2, 0, Settings.FovRadius * 2)
+        local mousePos = UserInputService:GetMouseLocation()
+        FOVFrame.Position = UDim2.new(0, mousePos.X, 0, mousePos.Y)
     else
-        FOVCircle.Visible = false
+        FOVFrame.Visible = false
     end
 
-    -- 2. Antenna ESP Update (Linha vertical subindo da cabeça)
-    if Settings.AntennaEnabled then
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-                local head = player.Character.Head
-                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-                
-                if humanoid and humanoid.Health > 0 then
-                    if not AntennaDrawings[player] then
-                        local line = Drawing.new("Line")
-                        line.Thickness = 2
-                        line.Color = Color3.fromRGB(255, 50, 50)
-                        line.Transparency = 0.8
-                        AntennaDrawings[player] = line
-                    end
-
-                    local line = AntennaDrawings[player]
-                    local topWorldPos = head.Position + Vector3.new(0, 3.5, 0) -- Altura da antena acima da cabeça
-                    
-                    local headScreen, headOnScreen = Camera:WorldToViewportPoint(head.Position)
-                    local topScreen, topOnScreen = Camera:WorldToViewportPoint(topWorldPos)
-
-                    if headOnScreen and topOnScreen then
-                        line.From = Vector2.new(headScreen.X, headScreen.Y)
-                        line.To = Vector2.new(topScreen.X, topScreen.Y)
-                        line.Visible = true
-                    else
-                        line.Visible = false
-                    end
-                else
-                    if AntennaDrawings[player] then
-                        AntennaDrawings[player].Visible = false
-                    end
-                end
+    -- Gerenciar Antenas
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            if Settings.AntennaEnabled then
+                UpdateAntenna(player, true)
+            else
+                UpdateAntenna(player, false)
             end
         end
-    else
-        -- Limpar antenas se desativado
-        for _, line in pairs(AntennaDrawings) do
-            line.Visible = false
-        end
     end
 
-    -- 3. Aimbot Execution (Grudar na cabeça ao segurar Botão Direito do Mouse)
+    -- Executar Aimbot (Ativado ao segurar Botão Direito do Mouse)
     if Settings.AimbotEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local targetHead = GetClosestTarget()
         if targetHead then
@@ -309,12 +274,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Limpeza ao sair ou resetar
-Players.PlayerRemoving:Connect(function(player)
-    if AntennaDrawings[player] then
-        AntennaDrawings[player]:Remove()
-        AntennaDrawings[player] = nil
-    end
-end)
-
-print("[+] Tactical Hub successfully loaded and fully functional.")
+print("[+] Hub atualizado com sucesso e totalmente funcional!")
