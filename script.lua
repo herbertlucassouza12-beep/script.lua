@@ -1,6 +1,6 @@
 --[================================================================================]--
--- Project: Functional Tactical UI Hub (Aimbot, FOV, Antenna ESP)                   --
--- Target: Roblox Client Instrumentation (Luau)                                     --
+-- Project: Functional Tactical UI Hub (Aimbot com Tecla E, FOV, Antena, HUD Móvel)--
+-- Target: Roblox Client Instrumentation (Luau / Real Executor)                     --
 --[================================================================================]--
 
 local Players = game:GetService("Players")
@@ -27,7 +27,7 @@ if not ScreenGui.Parent then
     ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 end
 
--- Janela Principal
+-- Janela Principal (HUD Móvel)
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 520, 0, 380)
@@ -45,7 +45,7 @@ MainStroke.Color = Color3.fromRGB(50, 50, 70)
 MainStroke.Thickness = 1.5
 MainStroke.Parent = MainFrame
 
--- Barra Superior
+-- Barra Superior (Usada para arrastar o HUD)
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
 TopBar.Size = UDim2.new(1, 0, 0, 40)
@@ -62,7 +62,7 @@ TitleLabel.Size = UDim2.new(1, -20, 1, 0)
 TitleLabel.Position = UDim2.new(0, 15, 0, 0)
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "TACTICAL INSTRUMENTATION HUB [FIXED]"
+TitleLabel.Text = "TACTICAL HUB [TECLA E + HUD MÓVEL]"
 TitleLabel.TextColor3 = Color3.fromRGB(220, 220, 240)
 TitleLabel.TextSize = 14
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -153,7 +153,7 @@ local function CreateToggle(name, callback)
     end)
 end
 
-CreateToggle("Aimbot (Head Lock - Segure Botão Direito)", function(state)
+CreateToggle("Aimbot (Segurar TECLA E para grudar na cabeça)", function(state)
     Settings.AimbotEnabled = state
 end)
 
@@ -165,7 +165,35 @@ CreateToggle("ESP Antenna (Linha na Cabeça)", function(state)
     Settings.AntennaEnabled = state
 end)
 
--- Sistema de FOV utilizando GUI do Roblox (Garante compatibilidade total sem depender de Drawing API externa)
+-- Lógica para Movimentar o HUD (Arrastar pela barra superior)
+local dragging, dragInput, dragStart, startPos
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if dragging and dragInput then
+        local delta = dragInput.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Círculo de FOV
 local FOVGui = Instance.new("ScreenGui")
 FOVGui.Name = "FOVCircleGui"
 FOVGui.Parent = CoreGui
@@ -186,7 +214,7 @@ local FOVCorner = Instance.new("UICorner")
 FOVCorner.CornerRadius = UDim.new(1, 0)
 FOVCorner.Parent = FOVFrame
 
--- Estrutura de Armazenamento de Antenas (BillboardGuids na cabeça)
+-- Gerenciador de Antenas ESP
 local ActiveAntennas = {}
 
 local function UpdateAntenna(player, enable)
@@ -217,6 +245,7 @@ local function UpdateAntenna(player, enable)
     end
 end
 
+-- Detecção do alvo mais próximo dentro do FOV
 local function GetClosestTarget()
     local mouseLocation = UserInputService:GetMouseLocation()
     local closestTarget = nil
@@ -242,7 +271,7 @@ local function GetClosestTarget()
     return closestTarget
 end
 
--- Loop de Execução Principal
+-- Loop Principal de Execução
 RunService.RenderStepped:Connect(function()
     -- Atualizar FOV
     if Settings.FovEnabled then
@@ -265,8 +294,8 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Executar Aimbot (Ativado ao segurar Botão Direito do Mouse)
-    if Settings.AimbotEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+    -- Aimbot: Ativado ao manter a TECLA 'E' pressionada
+    if Settings.AimbotEnabled and UserInputService:IsKeyDown(Enum.KeyCode.E) then
         local targetHead = GetClosestTarget()
         if targetHead then
             Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
@@ -274,4 +303,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("[+] Hub atualizado com sucesso e totalmente funcional!")
+print("[+] Hub configurado: Arraste pela barra superior, ative as opções e segure 'E' para o Aimbot!")
